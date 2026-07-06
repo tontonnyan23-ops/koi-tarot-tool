@@ -316,6 +316,14 @@
         🎂 生年月日からの性格・恋愛傾向（生年月日欄が必要です）
       </label>
       <label class="check-line">
+        <input type="checkbox" id="mAstro">
+        ⭐ 西洋占星術（星座からの恋愛傾向・相性）
+      </label>
+      <label class="check-line">
+        <input type="checkbox" id="mNumero">
+        🔢 数秘術（運命数から見る恋愛パターン・相性）
+      </label>
+      <label class="check-line">
         <input type="checkbox" id="mShichu">
         🀄 四柱推命の要素（生年月日から気質・相性を読み解く）
       </label>
@@ -329,6 +337,11 @@
           <textarea id="meishiki" rows="3" style="min-height:60px;" placeholder="例：&#10;相談者　年柱：乙亥／月柱：庚辰／日柱：戊寅&#10;お相手　年柱：癸酉／月柱：庚申／日柱：丙午"></textarea>
         </label>
       </div>
+      <div class="volume-note" style="margin-top:8px;">
+        💡 <strong>視点は多いほど良いわけではありません。タロット＋2つまでが目安です。</strong><br>
+        根拠となる情報（生年月日など）がある視点だけを選ぶと、1つ1つの読み解きが深くなり、鑑定の満足度が上がります。
+      </div>
+      <div class="key-status" id="viewsNote" style="margin-top:4px; font-size:.82rem; white-space:pre-line;"></div>
     </fieldset>
 
     <fieldset>
@@ -462,6 +475,10 @@ const SYSTEM_PROMPT = `あなたは「恋愛タロット占い師」です。恋
 
 ・生年月日からの性格・恋愛傾向：入力された生年月日から読み取れる、生まれ持った性格傾向・恋愛のクセ・二人の相性の傾向を、タロットの流れと矛盾しないよう自然に織り込む。星座や数秘などの用語を羅列せず、「〇〇さんは本来こういう気質を持っている方」という形で穏やかに伝える。生年月日が未入力の場合はこの視点は省略し、その旨を無理に説明しない。
 
+・西洋占星術（星座）の視点：入力された生年月日から太陽星座を割り出し、その星座の恋愛傾向・愛し方のクセ・大切にしたい距離感を、タロットの流れに重ねて伝える。星座の変わり目（前後1日程度）の生まれの場合は断定せず「〇〇座寄りの気質」とやわらかく表現する。生まれた時間・場所が不明な場合、月星座・アセンダント・ハウスなど出生図の詳細には踏み込まない。相談者とお相手の両方の生年月日がある場合は、星座同士の相性の傾向にも触れてよい。生年月日が未入力の場合はこの視点は省略する。
+
+・数秘術の視点：生年月日の数字をすべて足して一桁になるまで計算した「運命数」（11・22・33になった場合はマスターナンバーとしてそのまま扱う）をもとに、恋愛での行動パターン・愛情表現のクセ・大切にしたい価値観を読み解く。計算は内部で丁寧に確認し、鑑定書には途中式を書かず、結果だけを自然に織り込む。相談者とお相手の両方の生年月日がある場合は、運命数の組み合わせから相性の傾向に触れてよい。生年月日が未入力の場合はこの視点は省略する。
+
 ・四柱推命の要素：
 　- 入力に【命式】が与えられている場合は、その命式（年柱・月柱・日柱など）をそのまま正として使い、計算し直さない。
 　- 命式が与えられておらず生年月日がある場合のみ、生年月日（と分かれば生まれた時間）から命式を推定する。節入り（月の変わり目）前後は誤差が出やすいことを踏まえ、断定的に言い切らず「〇〇の傾向が感じられます」というトーンにする。
@@ -469,7 +486,7 @@ const SYSTEM_PROMPT = `あなたは「恋愛タロット占い師」です。恋
 　- 専門用語（十干十二支・通変星など）を使う場合は、必ず意味を一言添える。用語の解説だけで終わらせず、必ず「だから恋愛ではこう出やすい」という具体的な読み解きにつなげる。
 　- 生年月日も命式も未入力の場合は、四柱推命の要素は省略する。
 
-これらの視点を複数取り入れる場合、それぞれをバラバラに述べるのではなく、「タロットのカードが示す流れ」と「生まれ持った気質」と「心の動き」が響き合うように統合して伝える。必要に応じて【生まれ持った気質と恋愛の傾向について】のような項目を1つ加えてよいが、相談内容から離れすぎないこと。
+これらの視点を複数取り入れる場合、それぞれをバラバラに述べるのではなく、「タロットのカードが示す流れ」と「生まれ持った気質」と「心の動き」が響き合うように統合して伝える。必要に応じて【生まれ持った気質と恋愛の傾向について】のような項目を1つ加えてよいが、相談内容から離れすぎないこと。取り入れる視点が3つ以上ある場合は、すべての占術を均等に説明しようとせず、相談内容に最も関係の深い気づきだけを選んで使うこと。占術の説明が相談への答えより多くなってはならない。
 
 # 鑑定文の締め（最重要・厳守）
 鑑定書の最後は、必ず以下の文章のみを使用する。
@@ -536,7 +553,7 @@ document.querySelectorAll('input[name="mode"]').forEach((r) => {
 });
 
 // ---------- フォームの保存・復元 ----------
-const FORM_IDS = ["theme", "cname", "cgender", "cage", "cbirth", "cbtime", "pname", "pgender", "page_", "pbirth", "pbtime", "relation", "content", "mPsych", "mBirth", "mShichu", "meishiki", "cardnames"];
+const FORM_IDS = ["theme", "cname", "cgender", "cage", "cbirth", "cbtime", "pname", "pgender", "page_", "pbirth", "pbtime", "relation", "content", "mPsych", "mBirth", "mAstro", "mNumero", "mShichu", "meishiki", "cardnames"];
 function saveForm() {
   const data = { mode: document.querySelector('input[name="mode"]:checked').value,
                  volume: document.querySelector('input[name="volume"]:checked').value };
@@ -602,6 +619,27 @@ function updateShichuField() {
 $("mShichu").addEventListener("change", updateShichuField);
 updateShichuField(); // 復元後の初期表示に反映
 
+// 視点の選びすぎ・生年月日未入力への軽い注意
+const VIEW_IDS = ["mPsych", "mBirth", "mAstro", "mNumero", "mShichu"];
+const BIRTH_VIEW_IDS = ["mBirth", "mAstro", "mNumero", "mShichu"];
+function updateViewsNote() {
+  const notes = [];
+  const count = VIEW_IDS.filter((id) => $(id).checked).length;
+  if (count >= 3) {
+    notes.push("⚠️ 視点が" + count + "つ選ばれています。多いと1つ1つの読み解きが浅くなりやすいので、視点を絞るか、ボリュームを「フル」にするのがおすすめです。");
+  }
+  const needsBirth = BIRTH_VIEW_IDS.some((id) => $(id).checked);
+  if (needsBirth && !val("cbirth")) {
+    notes.push("🎂 生年月日を使う視点がオンですが、相談者さまの生年月日が未入力です。入力すると鑑定に反映されます。");
+  }
+  const el = $("viewsNote");
+  el.textContent = notes.join("\n");
+  el.style.color = "#b0524f";
+}
+VIEW_IDS.forEach((id) => $(id).addEventListener("change", updateViewsNote));
+$("cbirth").addEventListener("input", updateViewsNote);
+updateViewsNote(); // 復元後の初期表示に反映
+
 function buildUserPrompt() {
   const mode = document.querySelector('input[name="mode"]:checked').value;
   const volume = document.querySelector('input[name="volume"]:checked').value;
@@ -633,6 +671,8 @@ function buildUserPrompt() {
   const views = ["タロット（主軸）"];
   if ($("mPsych").checked) views.push("心理学の視点");
   if ($("mBirth").checked) views.push("生年月日からの性格・恋愛傾向");
+  if ($("mAstro").checked) views.push("西洋占星術（星座）の視点");
+  if ($("mNumero").checked) views.push("数秘術の視点");
   if ($("mShichu").checked) views.push("四柱推命の要素");
   lines.push("【取り入れる視点】" + views.join("、"));
   if ($("mShichu").checked && val("meishiki")) {
