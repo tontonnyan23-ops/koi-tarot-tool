@@ -175,7 +175,7 @@
     margin-left: 6px;
     vertical-align: middle;
   }
-  #checkerBox h2 {
+  #checkerBox h2, #repeatBox h2 {
     font-size: 1rem;
     margin: 0 0 10px;
     color: var(--accent-dark);
@@ -433,6 +433,26 @@
       <div id="teian5Output" class="subOutput"></div>
     </div>
 
+    <!-- 追加鑑定（リピート購入） -->
+    <div id="repeatBox" style="margin-top:22px;">
+      <h2>➕ 追加鑑定 <span class="badge">前回の流れを引き継いで自動生成</span></h2>
+      <p style="font-size:.85rem; color:var(--sub); margin:0 0 8px;">
+        提案した鑑定をご購入いただいたら、鑑定名を入れてボタンを押すだけ。<strong>この画面で直前に作った鑑定の流れを引き継いだ</strong>続きの鑑定書を自動生成します。
+      </p>
+      <label class="field">購入された鑑定名
+        <input type="text" id="repeatName" placeholder="例：彼の本音をさらに深く見る鑑定">
+      </label>
+      <div class="toolbar" style="margin-top:8px;">
+        <button class="btn-sub" id="repeatBtn">➕ 追加鑑定書を作成する（自動生成）</button>
+        <button class="btn-sub" id="copyRepeatBtn" disabled>📋 追加鑑定書をコピー</button>
+      </div>
+      <div id="repeatOutput" class="subOutput" style="display:none;"></div>
+      <div class="volume-note" style="margin-top:10px;">
+        💡 ボリュームは上の「鑑定ボリューム」で選択中のものが使われます。生成後は「✅ 納品前チェック」に貼って確認し、自分の言葉に整えてから納品してください。<br>
+        💡 ブラウザを閉じて時間が空いた場合は、ご相談内容の欄に前回の鑑定書（または要点）を貼り付けて、通常の「鑑定書を作成する」で新しく作ってください。
+      </div>
+    </div>
+
     <!-- 納品前チェック -->
     <div id="checkerBox" style="margin-top:22px;">
       <h2>✅ 納品前チェック <span class="badge">貼り付けるだけで納品ルールを自動確認</span></h2>
@@ -621,8 +641,7 @@ const stopBtn = $("stopBtn");
 const charCount = $("charCount");
 
 let abortController = null;
-let lastUserPrompt = null;   // 提案３・提案５用に直前の鑑定リクエストを保持
-let lastReading = null;      // 直前の鑑定書全文
+let convo = [];   // この画面でのAIとのやり取り履歴（提案３・提案５・追加鑑定が前回の流れを引き継ぐために使用）
 
 // ---------- 設定モーダル ----------
 const modal = $("settingsModal");
@@ -976,8 +995,7 @@ generateBtn.addEventListener("click", async () => {
     } else {
       setStatus("✅ 鑑定書が完成しました（" + text.length + "文字）。チェック→自分の言葉に整えてから納品してください。", "ok");
     }
-    lastUserPrompt = userPrompt;
-    lastReading = text;
+    convo = text ? [{ role: "user", content: userPrompt }, { role: "assistant", content: text }] : [];
     const has = !!text;
     copyBtn.disabled = !has;
     $("sendCheckBtn").disabled = !has;
@@ -996,7 +1014,7 @@ generateBtn.addEventListener("click", async () => {
 
 // ---------- 提案３・提案５（ボタン1つで続きを生成） ----------
 async function runTeian(command, boxId, outId) {
-  if (!lastReading || !lastUserPrompt) return;
+  if (convo.length === 0) return;
   $(boxId).style.display = "block";
   $(outId).textContent = "";
   $("teian3Btn").disabled = true;
@@ -1010,11 +1028,7 @@ async function runTeian(command, boxId, outId) {
   let text = "";
   try {
     await callClaudeStream(
-      [
-        { role: "user", content: lastUserPrompt },
-        { role: "assistant", content: lastReading },
-        { role: "user", content: command },
-      ],
+      [...convo, { role: "user", content: command }],
       (chunk) => { text += chunk; $(outId).textContent = text; },
       () => {},
     );
@@ -1033,6 +1047,64 @@ async function runTeian(command, boxId, outId) {
 }
 $("teian3Btn").addEventListener("click", () => runTeian("提案３", "teian3Box", "teian3Output"));
 $("teian5Btn").addEventListener("click", () => runTeian("提案５", "teian5Box", "teian5Output"));
+
+// ---------- 追加鑑定（前回の流れを引き継いで自動生成） ----------
+const VOLUME_DESC = { "ライト": "約800〜1000文字", "スタンダード": "約1000〜1500文字", "フル": "約1500〜2000文字" };
+function buildRepeatRequest(name) {
+  const volume = document.querySelector('input[name="volume"]:checked').value;
+  return "相談者さまが追加鑑定「" + name + "」を購入されました。\n"
+    + "これまでの相談内容と前回の鑑定結果を踏まえて、この追加鑑定の鑑定書を作成してください。\n\n"
+    + "・ルール（出力順・冒頭と締めの固定文・文体・禁止事項など）は前回とすべて同じにする\n"
+    + "・今回のテーマ「" + name + "」に集中し、前回の鑑定と同じ内容の繰り返しは避ける\n"
+    + "・前回の結果との繋がり（「前回、◯◯という流れが出ていましたが…」など）を自然に入れる\n"
+    + "・ご希望の鑑定ボリューム：" + volume + "（" + VOLUME_DESC[volume] + "）";
+}
+$("repeatBtn").addEventListener("click", async () => {
+  const name = val("repeatName");
+  if (!name) { setStatus("購入された鑑定名を入力してください。", "error"); $("repeatName").focus(); return; }
+  if (convo.length === 0) {
+    setStatus("先にこの画面で元の鑑定書を作成してください。時間が空いた場合は、ご相談内容の欄に前回の鑑定書を貼り付けて、通常の「鑑定書を作成する」で作れます。", "error");
+    return;
+  }
+  const req = buildRepeatRequest(name);
+  $("repeatOutput").style.display = "block";
+  $("repeatOutput").textContent = "";
+  $("copyRepeatBtn").disabled = true;
+  $("repeatBtn").disabled = true;
+  generateBtn.disabled = true;
+  stopBtn.style.display = "inline-block";
+  setStatus("➕ 前回の流れを引き継いで、追加鑑定書を作成しています…");
+
+  let text = "";
+  try {
+    const stopReason = await callClaudeStream(
+      [...convo, { role: "user", content: req }],
+      (chunk) => { text += chunk; $("repeatOutput").textContent = text; },
+      () => setStatus("🔮 カードを読み解いています…（少しお待ちください）"),
+    );
+    if (stopReason === "refusal") {
+      setStatus("⚠️ この内容では生成できませんでした。表現を変えてお試しください。", "error");
+    } else {
+      setStatus("✅ 追加鑑定書が完成しました（" + text.length + "文字）。チェック→自分の言葉に整えてから納品してください。", "ok");
+    }
+    if (text) {
+      convo.push({ role: "user", content: req }, { role: "assistant", content: text });
+      $("copyRepeatBtn").disabled = false;
+    }
+  } catch (e) {
+    if (text) $("repeatOutput").textContent = text; // 途中まで出た分は残す
+    setStatus(friendlyError(e), "error");
+  } finally {
+    $("repeatBtn").disabled = false;
+    generateBtn.disabled = false;
+    stopBtn.style.display = "none";
+    abortController = null;
+  }
+});
+$("copyRepeatBtn").addEventListener("click", () => copyText(
+  $("repeatOutput").textContent,
+  "📋 追加鑑定書をコピーしました。納品前に必ず読み返して、自分の言葉に整えてください。"
+));
 
 // ---------- 中止 ----------
 stopBtn.addEventListener("click", () => {
