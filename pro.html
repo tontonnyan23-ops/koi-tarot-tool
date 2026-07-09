@@ -238,7 +238,9 @@
 
   <!-- 入力パネル -->
   <div class="panel">
-    <h2>📝 鑑定内容の入力</h2>
+    <h2 style="display:flex; justify-content:space-between; align-items:center; gap:8px;">📝 鑑定内容の入力
+      <button class="btn-sub" id="clearFormBtn" style="font-size:.76rem; padding:5px 10px;">🧹 新しい相談者</button>
+    </h2>
 
     <fieldset>
       <legend>占い方</legend>
@@ -287,6 +289,9 @@
         <label class="field">生まれた時間（分かれば）
           <input type="text" id="cbtime" placeholder="例：午前10時ごろ（任意）">
         </label>
+      </div>
+      <div class="volume-note" style="margin-top:6px;">
+        🔒 入力内容はAIに送られるため、<strong>お名前は実名を避けて、ニックネームやイニシャルで入力</strong>することをおすすめします（お相手さまも同様）。
       </div>
     </fieldset>
 
@@ -522,6 +527,11 @@ const SYSTEM_PROMPT = `あなたは「恋愛タロット占い師」です。恋
 - 年齢や関係性が未入力でも鑑定は可能
 - カード名は基本的に明示せず、象徴やイメージとして文章に自然に溶け込ませる
 - 入力に「カード名を併記する」と指定があった場合のみカード名を併記する
+
+# 配慮が必要なご相談への対応
+- 心や体の不調、妊娠・健康、法律・お金が関わる内容が含まれる場合、その部分についてはカードで断定せず、必要に応じて専門家（医療機関・法律や公的な相談窓口など）に相談することをやさしく添える
+- 相談者を追い詰める表現、恐怖や罪悪感を煽る表現、鑑定への依存をあおる表現は使わない
+- どんな結果であっても、相談者が自分を責めずに前を向けるような伝え方で締めくくる
 
 # 鑑定ボリューム
 - ライト：約800〜1000文字（要点をシンプルに）
@@ -778,6 +788,34 @@ function updateViewsNote() {
 VIEW_IDS.forEach((id) => $(id).addEventListener("change", updateViewsNote));
 $("cbirth").addEventListener("input", updateViewsNote);
 updateViewsNote(); // 復元後の初期表示に反映
+
+// ---------- 新しい相談者（相談者情報だけクリア、商品設定は残す） ----------
+const PERSON_IDS = ["cname", "cgender", "cage", "cbirth", "cbtime", "pname", "pgender", "page_", "pbirth", "pbtime", "relation", "content", "meishiki", "repeatName"];
+$("clearFormBtn").addEventListener("click", () => {
+  if (!confirm("相談者さまの入力内容をすべて消去して、新しい鑑定を始めますか？\n（占い方・テーマ・ボリューム・視点などの商品設定は残ります）")) return;
+  PERSON_IDS.forEach((id) => { const el = $(id); if (el) el.value = ""; });
+  convo = []; // 前の相談者の文脈を完全に破棄（提案・追加鑑定の混入防止）
+  output.textContent = "";
+  charCount.textContent = "";
+  copyBtn.disabled = true;
+  $("sendCheckBtn").disabled = true;
+  $("teian3Btn").disabled = true;
+  $("teian5Btn").disabled = true;
+  $("copyRepeatBtn").disabled = true;
+  $("freeSteps").style.display = "none";
+  $("teian3Box").style.display = "none";
+  $("teian3Output").textContent = "";
+  $("teian5Box").style.display = "none";
+  $("teian5Output").textContent = "";
+  $("repeatOutput").style.display = "none";
+  $("repeatOutput").textContent = "";
+  $("checkInput").value = "";
+  $("checkResults").textContent = "";
+  updateViewsNote();
+  saveForm();
+  setStatus("🧹 相談者さまの情報をクリアしました。商品設定（占い方・テーマ・ボリューム・視点）はそのまま残っています。", "ok");
+  $("cname").focus();
+});
 
 // ---------- ツール側で行う確定計算（AIの計算ミス防止） ----------
 // 生年月日の文字列を年・月・日に分解（例：1995年4月10日、1995/4/10、1995-4-10）
