@@ -239,7 +239,7 @@
   <!-- 入力パネル -->
   <div class="panel">
     <h2 style="display:flex; justify-content:space-between; align-items:center; gap:8px;">📝 鑑定内容の入力
-      <button class="btn-sub" id="clearFormBtn" style="font-size:.76rem; padding:5px 10px;">🧹 新しい相談者</button>
+      <button class="btn-sub" id="clearFormBtn" style="font-size:.76rem; padding:5px 10px;">🧹 入力内容クリア</button>
     </h2>
 
     <fieldset>
@@ -447,6 +447,13 @@
       <label class="field">購入された鑑定名
         <input type="text" id="repeatName" placeholder="例：彼の本音をさらに深く見る鑑定">
       </label>
+      <label class="field">この鑑定で占う項目（<strong>1行に1つずつ</strong>・提案文から「・」付きのままコピペしてOK）
+        <textarea id="repeatItems" rows="4" style="min-height:70px;" placeholder="例：
+彼が結婚について本当はどのように考えているのか
+さくさんとの結婚をイメージしているのか
+結婚に向けて今、彼の中で何が障害となっているのか"></textarea>
+      </label>
+      <div class="key-status" id="repeatItemsCount" style="margin-top:4px; font-size:.82rem;"></div>
       <div class="toolbar" style="margin-top:8px;">
         <button class="btn-sub" id="repeatBtn">➕ 追加鑑定書を作成する（自動生成）</button>
         <button class="btn-sub" id="copyRepeatBtn" disabled>📋 追加鑑定書をコピー</button>
@@ -790,7 +797,7 @@ $("cbirth").addEventListener("input", updateViewsNote);
 updateViewsNote(); // 復元後の初期表示に反映
 
 // ---------- 新しい相談者（相談者情報だけクリア、商品設定は残す） ----------
-const PERSON_IDS = ["cname", "cgender", "cage", "cbirth", "cbtime", "pname", "pgender", "page_", "pbirth", "pbtime", "relation", "content", "meishiki", "repeatName"];
+const PERSON_IDS = ["cname", "cgender", "cage", "cbirth", "cbtime", "pname", "pgender", "page_", "pbirth", "pbtime", "relation", "content", "meishiki", "repeatName", "repeatItems"];
 $("clearFormBtn").addEventListener("click", () => {
   if (!confirm("相談者さまの入力内容をすべて消去して、新しい鑑定を始めますか？\n（占い方・テーマ・ボリューム・視点などの商品設定は残ります）")) return;
   PERSON_IDS.forEach((id) => { const el = $(id); if (el) el.value = ""; });
@@ -812,6 +819,7 @@ $("clearFormBtn").addEventListener("click", () => {
   $("checkInput").value = "";
   $("checkResults").textContent = "";
   updateViewsNote();
+  updateRepeatItemsCount();
   saveForm();
   setStatus("🧹 相談者さまの情報をクリアしました。商品設定（占い方・テーマ・ボリューム・視点）はそのまま残っています。", "ok");
   $("cname").focus();
@@ -1093,12 +1101,34 @@ $("teian5Btn").addEventListener("click", () => runTeian("提案５", "teian5Box"
 
 // ---------- 追加鑑定（前回の流れを引き継いで自動生成） ----------
 const VOLUME_DESC = { "ライト": "約800〜1000文字", "スタンダード": "約1000〜1500文字", "フル": "約1500〜2000文字" };
+// 占う項目を1行1項目で読み取る（行頭の「・」などは自動で除去、見出し行は無視）
+function repeatItemsList() {
+  return val("repeatItems").split("\n")
+    .map((s) => s.trim().replace(/^[・\-*●○◎▪︎]\s*/, ""))
+    .filter((s) => s && !/占う項目/.test(s));
+}
+function updateRepeatItemsCount() {
+  const n = repeatItemsList().length;
+  const el = $("repeatItemsCount");
+  el.textContent = n === 0 ? "" : "✅ " + n + "件の項目が入力されています（この項目がそのまま鑑定の見出しになります）";
+  el.style.color = "#3d8b6d";
+}
+$("repeatItems").addEventListener("input", updateRepeatItemsCount);
+
 function buildRepeatRequest(name) {
   const volume = document.querySelector('input[name="volume"]:checked').value;
+  const items = repeatItemsList();
+  let itemBlock;
+  if (items.length > 0) {
+    itemBlock = "・この鑑定で占う項目（ご案内時に提示済み。この項目をそのまま鑑定の軸【〇〇について】として、この順番で使うこと。省略・統合は禁止）：\n"
+      + items.map((t, i) => "　項目" + (i + 1) + "：" + t).join("\n") + "\n";
+  } else {
+    itemBlock = "・この鑑定をご案内した際に「占う項目」を提示している場合は、その項目をそのまま鑑定の軸（【〇〇について】の見出し）として使う\n";
+  }
   return "相談者さまが追加鑑定「" + name + "」を購入されました。\n"
     + "これまでの相談内容と前回の鑑定結果を踏まえて、この追加鑑定の鑑定書を作成してください。\n\n"
     + "・ルール（出力順・冒頭と締めの固定文・文体・禁止事項など）は前回とすべて同じにする\n"
-    + "・この鑑定をご案内した際に「占う項目」を提示している場合は、その項目をそのまま鑑定の軸（【〇〇について】の見出し）として使う\n"
+    + itemBlock
     + "・今回のテーマ「" + name + "」に集中し、前回の鑑定と同じ内容の繰り返しは避ける\n"
     + "・前回の結果との繋がり（「前回、◯◯という流れが出ていましたが…」など）を自然に入れる\n"
     + "・ご希望の鑑定ボリューム：" + volume + "（" + VOLUME_DESC[volume] + "）";
